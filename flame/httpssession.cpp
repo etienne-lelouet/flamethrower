@@ -114,7 +114,7 @@ static int on_stream_close_callback(nghttp2_session *session, int32_t stream_id,
         std::cerr << "No stream data on stream close" << std::endl;
         return 0;
     }
-    nghttp2_session_terminate_session(session, NGHTTP2_NO_ERROR);
+    // nghttp2_session_terminate_session(session, NGHTTP2_NO_ERROR);
     return 0;
 }
 
@@ -239,7 +239,7 @@ int HTTPSSession::session_send()
 
 void HTTPSSession::on_connect_event()
 {
-    _current_session = {};
+    // _current_session = {};
     do_handshake();
 }
 
@@ -284,7 +284,6 @@ void HTTPSSession::write(std::unique_ptr<char[]> data, size_t len)
         hdrs.push_back(HDR_S("content-length", std::to_string(len)));
         provider.read_callback = post_data;
     }
-
     stream_id = nghttp2_submit_request(_current_session, NULL, hdrs.data(), hdrs.size(), &provider, stream_data.get());
     if (stream_id < 0) {
         std::cerr << "Could not submit HTTP request: " << nghttp2_strerror(stream_id);
@@ -339,6 +338,16 @@ void HTTPSSession::send_tls(void *data, size_t len)
 
 void HTTPSSession::do_handshake()
 {
+    switch (_tls_state) {
+    case LinkState::DATA:
+        TCPSession::on_connect_event();
+        return;
+    case LinkState::HANDSHAKE:
+        break;
+
+    case LinkState::CLOSE:
+        break;
+    }
     int err = gnutls_handshake(_gnutls_session);
     if (err == GNUTLS_E_SUCCESS) {
         gnutls_datum_t alpn;

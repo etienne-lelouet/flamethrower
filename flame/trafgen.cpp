@@ -3,12 +3,12 @@
 #include <algorithm>
 #include <iostream>
 #include <memory>
+#include <netinet/in.h>
 #include <random>
 #include <string>
-#include <netinet/in.h>
 
-#include "trafgen.h"
 #include "tcptlssession.h"
+#include "trafgen.h"
 
 TrafGen::TrafGen(std::shared_ptr<uvw::Loop> l,
     std::shared_ptr<Metrics> s,
@@ -60,7 +60,6 @@ void TrafGen::process_wire(const char data[], size_t len)
     _metrics->receive(_in_flight[id].send_time, rcode, _in_flight.size());
     _in_flight.erase(id);
     _free_id_list.push_back(id);
-
 }
 
 void TrafGen::start_udp()
@@ -114,7 +113,7 @@ void TrafGen::start_tcp_session()
         _tcp_handle->close();
     };
     auto got_dns_message = [this](std::unique_ptr<const char[]> data,
-                                  size_t size) {
+                               size_t size) {
         process_wire(data.get(), size);
     };
     auto connection_ready = [this]() {
@@ -139,7 +138,7 @@ void TrafGen::start_tcp_session()
 
 #ifdef DOH_ENABLE
             // Send one by one with DoH
-            if(_traf_config->protocol == Protocol::DOH) {
+            if (_traf_config->protocol == Protocol::DOH) {
                 auto qt = (_traf_config->method == HTTPMethod::GET)
                     ? _qgen->next_base64url(id_list[i])
                     : _qgen->next_udp(id_list[i]);
@@ -156,7 +155,7 @@ void TrafGen::start_tcp_session()
         }
 
 #ifdef DOH_ENABLE
-        if(_traf_config->protocol != Protocol::DOH) {
+        if (_traf_config->protocol != Protocol::DOH) {
 #endif
             auto qt = _qgen->next_tcp(id_list);
 
@@ -170,13 +169,13 @@ void TrafGen::start_tcp_session()
     };
 
     // For now, treat a TLS handshake failure as malformed data
-    if(_traf_config->protocol == Protocol::TCP) {
+    if (_traf_config->protocol == Protocol::TCP) {
         _tcp_session = std::make_shared<TCPSession>(_tcp_handle, malformed_data, got_dns_message, connection_ready);
-    } else if(_traf_config->protocol == Protocol::DOT) {
+    } else if (_traf_config->protocol == Protocol::DOT) {
         _tcp_session = std::make_shared<TCPTLSSession>(_tcp_handle, malformed_data, got_dns_message, connection_ready, malformed_data);
-    } 
+    }
 #ifdef DOH_ENABLE
-	else {
+    else {
         _tcp_session = std::make_shared<HTTPSSession>(_tcp_handle, malformed_data, got_dns_message, connection_ready, malformed_data, current_target, _traf_config->method);
     }
 #endif
@@ -192,7 +191,8 @@ void TrafGen::start_tcp_session()
     }
 }
 
-void TrafGen::connect_tcp_events() {
+void TrafGen::connect_tcp_events()
+{
     /** SOCKET CALLBACKS **/
 
     // SOCKET: local socket was closed, cleanup resources and possibly restart another connection
@@ -202,24 +202,17 @@ void TrafGen::connect_tcp_events() {
             _finish_session_timer->stop();
             _finish_session_timer->close();
         }
-        if (_tcp_handle.get()) {
-            _tcp_handle->stop();
-        }
-        _tcp_session.reset();
-        _tcp_handle.reset();
         _finish_session_timer.reset();
         handle_timeouts(true);
         if (!_stopping) {
-            start_tcp_session();
+            _tcp_session->on_connect_event();
         }
     });
 
     // SOCKET: socket error
     _tcp_handle->on<uvw::ErrorEvent>([this](uvw::ErrorEvent &event, uvw::TCPHandle &h) {
         if (_config->verbosity() > 1) {
-            std::cerr <<
-                _tcp_handle->sock().ip << ":" << _tcp_handle->sock().port <<
-                " - " << event.what() << std::endl;
+            std::cerr << _tcp_handle->sock().ip << ":" << _tcp_handle->sock().port << " - " << event.what() << std::endl;
         }
         _metrics->net_error();
         // triggers an immediate connection retry.
@@ -259,7 +252,6 @@ void TrafGen::connect_tcp_events() {
 
 void TrafGen::start_wait_timer_for_tcp_finish()
 {
-
     // wait for all responses, but no longer than query timeout
     // once we have all responses, or timed out, delay for delay time, then start over
     auto wait_time_start = std::chrono::high_resolution_clock::now();
@@ -270,7 +262,7 @@ void TrafGen::start_wait_timer_for_tcp_finish()
         auto now = std::chrono::high_resolution_clock::now();
         auto cur_wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - wait_time_start).count();
 
-        if ( (!_started_sending || _in_flight.size()) && (cur_wait_ms < (_traf_config->r_timeout * 1000))) {
+        if ((!_started_sending || _in_flight.size()) && (cur_wait_ms < (_traf_config->r_timeout * 1000))) {
             // queries in flight and timeout time not elapsed, still wait
             return;
         } else if (cur_wait_ms < (_traf_config->s_delay)) {
@@ -282,9 +274,12 @@ void TrafGen::start_wait_timer_for_tcp_finish()
         // shut down timer and connection. TCP CloseEvent will handle restarting sends.
         _finish_session_timer->stop();
         _started_sending = false;
-        _tcp_handle->stop();
         _finish_session_timer->close();
-        _tcp_handle->close();
+        _finish_session_timer.reset();
+        handle_timeouts(true);
+        if (!_stopping) {
+            _tcp_session->on_connect_event();
+        }
     });
     _finish_session_timer->start(uvw::TimerHandle::Time{1}, uvw::TimerHandle::Time{50});
 }
@@ -328,19 +323,22 @@ void TrafGen::udp_send()
 
 void TrafGen::start()
 {
-
     if (_traf_config->protocol == Protocol::UDP) {
         start_udp();
         _sender_timer = _loop->resource<uvw::TimerHandle>();
         _sender_timer->on<uvw::TimerEvent>([this](const uvw::TimerEvent &event, uvw::TimerHandle &h) {
-			switch(_traf_config->protocol) {
-				case Protocol::UDP: udp_send(); break;
-				case Protocol::TCP:
+            switch (_traf_config->protocol) {
+            case Protocol::UDP:
+                udp_send();
+                break;
+            case Protocol::TCP:
 #ifdef DOH_ENABLE
-				case Protocol::DOH:
+            case Protocol::DOH:
 #endif
-				case Protocol::DOT: start_tcp_session(); break;
-			}
+            case Protocol::DOT:
+                start_tcp_session();
+                break;
+            }
         });
         _sender_timer->start(uvw::TimerHandle::Time{1}, uvw::TimerHandle::Time{_traf_config->s_delay});
     } else {

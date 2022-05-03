@@ -6,6 +6,7 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_BUILD_TYPE Debug)
 
 # The following must be set BEFORE doing project() or enable_language().
 if (NOT CMAKE_BUILD_TYPE)
@@ -14,7 +15,6 @@ if (NOT CMAKE_BUILD_TYPE)
             "The type of build. Possible values are: Debug, Release, RelWithDebInfo and MinSizeRel.")
 endif()
 # ::-------------------------------------------------------------------------::
-
 project(flamethrower VERSION 0.12.0)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
