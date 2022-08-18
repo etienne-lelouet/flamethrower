@@ -197,15 +197,39 @@ void TrafGen::connect_tcp_events()
 
     // SOCKET: local socket was closed, cleanup resources and possibly restart another connection
     _tcp_handle->on<uvw::CloseEvent>([this](uvw::CloseEvent &event, uvw::TCPHandle &h) {
+        // std::cout << "no stopping, preparing to restart" << std::endl;
+        // auto wait_time = 0;
+        // auto now = std::chrono::high_resolution_clock::now();
+        // auto cur_wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - wait_time_start).count();
+        // if (cur_wait_ms < (_traf_config->s_delay)) {
+        //     wait_time = _traf_config->s_delay - cur_wait_ms;
+        // }
+        // if (_restart_conn_timer.get()) {
+        //     _restart_conn_timer->stop();
+        //     _restart_conn_timer->close();
+        // }
+        // _restart_conn_timer.reset();
+        // _restart_conn_timer = _loop->resource<uvw::TimerHandle>();
+        // std::cout << "Not stopping : restarting tcp session after delay" << std::endl;
+        // _restart_conn_timer->on<uvw::TimerEvent>([this](const uvw::TimerEvent &event, uvw::TimerHandle &h) {
+        //     std::cout << "TimerEvent : restarting" << std::endl;
+        //     start_tcp_session();
+        // });
+        // _restart_conn_timer->start(uvw::TimerHandle::Time{wait_time}, uvw::TimerHandle::Time{0});
         // if timer is still going (e.g. we got here through EndEvent), cancel it
         if (_finish_session_timer.get()) {
             _finish_session_timer->stop();
             _finish_session_timer->close();
         }
+        if (_tcp_handle.get()) {
+            _tcp_handle->stop();
+        }
+        _tcp_session.reset();
+        _tcp_handle.reset();
         _finish_session_timer.reset();
         handle_timeouts(true);
         if (!_stopping) {
-            _tcp_session->on_connect_event();
+            start_tcp_session();
         }
     });
 
@@ -286,7 +310,6 @@ void TrafGen::start_wait_timer_for_tcp_finish()
 
 void TrafGen::udp_send()
 {
-
     if (_udp_handle.get() && !_udp_handle->active())
         return;
     if (_qgen->finished())
@@ -385,7 +408,6 @@ void TrafGen::start()
  */
 void TrafGen::handle_timeouts(bool force_reset)
 {
-
     std::vector<uint16_t> timed_out;
     auto now = std::chrono::high_resolution_clock::now();
     for (auto i : _in_flight) {
