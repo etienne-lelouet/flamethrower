@@ -144,6 +144,11 @@ void TrafGen::start_tcp_session()
                     : _qgen->next_udp(id_list[i]);
                 _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
                 _metrics->send(std::get<1>(qt), 1, _in_flight.size());
+            } else {
+                auto qt = _qgen->next_tcp(id_list[i]);
+                _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
+
+                _metrics->send(std::get<1>(qt), 1, _in_flight.size());
             }
 #endif
         }
@@ -153,19 +158,6 @@ void TrafGen::start_tcp_session()
             _tcp_handle->close();
             return;
         }
-
-#ifdef DOH_ENABLE
-        if (_traf_config->protocol != Protocol::DOH) {
-#endif
-            auto qt = _qgen->next_tcp(id_list);
-
-            // async send the batch. fires WriteEvent when finished sending.
-            _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
-
-            _metrics->send(std::get<1>(qt), id_list.size(), _in_flight.size());
-#ifdef DOH_ENABLE
-        }
-#endif
     };
 
     // For now, treat a TLS handshake failure as malformed data
@@ -197,26 +189,6 @@ void TrafGen::connect_tcp_events()
 
     // SOCKET: local socket was closed, cleanup resources and possibly restart another connection
     _tcp_handle->on<uvw::CloseEvent>([this](uvw::CloseEvent &event, uvw::TCPHandle &h) {
-        // std::cout << "no stopping, preparing to restart" << std::endl;
-        // auto wait_time = 0;
-        // auto now = std::chrono::high_resolution_clock::now();
-        // auto cur_wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - wait_time_start).count();
-        // if (cur_wait_ms < (_traf_config->s_delay)) {
-        //     wait_time = _traf_config->s_delay - cur_wait_ms;
-        // }
-        // if (_restart_conn_timer.get()) {
-        //     _restart_conn_timer->stop();
-        //     _restart_conn_timer->close();
-        // }
-        // _restart_conn_timer.reset();
-        // _restart_conn_timer = _loop->resource<uvw::TimerHandle>();
-        // std::cout << "Not stopping : restarting tcp session after delay" << std::endl;
-        // _restart_conn_timer->on<uvw::TimerEvent>([this](const uvw::TimerEvent &event, uvw::TimerHandle &h) {
-        //     std::cout << "TimerEvent : restarting" << std::endl;
-        //     start_tcp_session();
-        // });
-        // _restart_conn_timer->start(uvw::TimerHandle::Time{wait_time}, uvw::TimerHandle::Time{0});
-        // if timer is still going (e.g. we got here through EndEvent), cancel it
         if (_finish_session_timer.get()) {
             _finish_session_timer->stop();
             _finish_session_timer->close();
@@ -260,6 +232,7 @@ void TrafGen::connect_tcp_events()
 
     // OUTGOING: write operation has finished
     _tcp_handle->on<uvw::WriteEvent>([this](uvw::WriteEvent &event, uvw::TCPHandle &h) {
+        puts("TRAFGEN: _tcp_handle->on<uvw::WriteEvent>");
         if (!_finish_session_timer)
             start_wait_timer_for_tcp_finish();
     });
@@ -283,23 +256,8 @@ void TrafGen::start_wait_timer_for_tcp_finish()
     _finish_session_timer = _loop->resource<uvw::TimerHandle>();
     _finish_session_timer->on<uvw::TimerEvent>([this, wait_time_start](const uvw::TimerEvent &event,
                                                    uvw::TimerHandle &h) {
-		
-		// L'ancien comportement était de ne recommencer à envoyer que quand on on avait plus de in-flight ou que le tiemout était dépassé => ce n'est plus nécessaire, la connexion reste ouverte donc on peut se permettre de déclnecher les envois régulièrement => commente ce bloc qui sert juste à vérifier qu'on a pas atteint le timeout et qu'on est encore en dessous du délai, ça utilise du CPU pour rien, le GC se charge très bien de collecter les timeouts en théorie, si on set le timer du gc à timeout / 2, il cach forcément tous les timeouts.
-		// En plus, au lieu de programmer l'execution de cette fonction toutes les 50ms, on la programme à s_delay, comme ça elle se déclenche quand tout a été envoyé.
-        // auto now = std::chrono::high_resolution_clock::now();
-        // auto cur_wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - wait_time_start).count();
-
-        // if ((!_started_sending || _in_flight.size()) && (cur_wait_ms < (_traf_config->r_timeout * 1000))) {
-        //     // queries in flight and timeout time not elapsed, still wait
-        //     return;
-        // } 
-		// if (cur_wait_ms < (_traf_config->s_delay)) {
-        //     // either timed out or nothing in flight. ensure delay period has passed
-        //     // before restarting
-        //     return;
-        // }
-
-        // shut down timer and connection. TCP CloseEvent will handle restarting sends.
+        // L'ancien comportement était de ne recommencer à envoyer que quand on on avait plus de in-flight ou que le tiemout était dépassé => ce n'est plus nécessaire, la connexion reste ouverte donc on peut se permettre de déclnecher les envois régulièrement => commente ce bloc qui sert juste à vérifier qu'on a pas atteint le timeout et qu'on est encore en dessous du délai, ça utilise du CPU pour rien, le GC se charge très bien de collecter les timeouts en théorie, si on set le timer du gc à timeout / 2, il cach forcément tous les timeouts.
+        // En plus, au lieu de programmer l'execution de cette fonction toutes les 50ms, on la programme à s_delay, comme ça elle se déclenche quand tout a été envoyé.
         _finish_session_timer->stop();
         _started_sending = false;
         _finish_session_timer->close();
