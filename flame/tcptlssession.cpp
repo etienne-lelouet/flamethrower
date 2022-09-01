@@ -145,18 +145,14 @@ void TCPTLSSession::do_handshake()
 {
     switch (_tls_state) {
     case LinkState::DATA:
-        std::cout << "link:data" << std::endl;
         TCPSession::on_connect_event();
         return;
     case LinkState::HANDSHAKE:
-        std::cout << "link:HANDSHAKE" << std::endl;
         break;
 
     case LinkState::CLOSE:
-        std::cout << "link:CLOSE" << std::endl;
         break;
     }
-    std::cout << "doing handshake" << std::endl;
     int err = gnutls_handshake(_gnutls_session);
     if (err == GNUTLS_E_SUCCESS) {
         _tls_state = LinkState::DATA;

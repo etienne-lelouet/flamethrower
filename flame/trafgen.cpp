@@ -201,6 +201,7 @@ void TrafGen::connect_tcp_events()
         _finish_session_timer.reset();
         handle_timeouts(true);
         if (!_stopping) {
+			puts("tcp close event, restarting");
             start_tcp_session();
         }
     });
@@ -217,6 +218,7 @@ void TrafGen::connect_tcp_events()
 
     // INCOMING: remote peer closed connection, EOF
     _tcp_handle->on<uvw::EndEvent>([this](uvw::EndEvent &event, uvw::TCPHandle &h) {
+		puts("connection resed by peer");
         _tcp_session->on_end_event();
     });
 
