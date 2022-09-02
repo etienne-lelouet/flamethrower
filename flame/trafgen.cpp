@@ -201,7 +201,6 @@ void TrafGen::connect_tcp_events()
         _finish_session_timer.reset();
         handle_timeouts(true);
         if (!_stopping) {
-			puts("tcp close event, restarting");
             start_tcp_session();
         }
     });
@@ -218,7 +217,7 @@ void TrafGen::connect_tcp_events()
 
     // INCOMING: remote peer closed connection, EOF
     _tcp_handle->on<uvw::EndEvent>([this](uvw::EndEvent &event, uvw::TCPHandle &h) {
-		puts("connection resed by peer");
+		puts("connection reset by peer");
         _tcp_session->on_end_event();
     });
 
@@ -234,7 +233,6 @@ void TrafGen::connect_tcp_events()
 
     // OUTGOING: write operation has finished
     _tcp_handle->on<uvw::WriteEvent>([this](uvw::WriteEvent &event, uvw::TCPHandle &h) {
-        puts("TRAFGEN: _tcp_handle->on<uvw::WriteEvent>");
         if (!_finish_session_timer)
             start_wait_timer_for_tcp_finish();
     });
