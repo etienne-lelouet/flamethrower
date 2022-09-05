@@ -38,7 +38,6 @@ TrafGen::TrafGen(std::shared_ptr<uvw::Loop> l,
 
 void TrafGen::process_wire(const char data[], size_t len)
 {
-
     if (len <= 12) {
         _metrics->bad_receive(_in_flight.size());
         return;
@@ -122,7 +121,7 @@ void TrafGen::start_tcp_session()
         std::vector<uint16_t> id_list;
         for (int i = 0; i < _traf_config->batch_count; i++) {
             if (_free_id_list.empty()) {
-                // out of ids, have to limit
+                puts("out of ids");
                 break;
             }
             if (_rate_limit && !_rate_limit->consume(1, this->_loop->now()))
@@ -154,10 +153,22 @@ void TrafGen::start_tcp_session()
         }
 
         if (id_list.size() == 0) {
-            // didn't send anything, probably due to rate limit. close.
+            puts("didn't sent anything");
             _tcp_handle->close();
             return;
         }
+#ifdef DOH_ENABLE
+        if (_traf_config->protocol != Protocol::DOH) {
+#endif
+            auto qt = _qgen->next_tcp(id_list);
+
+            // async send the batch. fires WriteEvent when finished sending.
+            _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
+
+            _metrics->send(std::get<1>(qt), id_list.size(), _in_flight.size());
+#ifdef DOH_ENABLE
+        }
+#endif
     };
 
     // For now, treat a TLS handshake failure as malformed data
@@ -256,6 +267,17 @@ void TrafGen::start_wait_timer_for_tcp_finish()
     _finish_session_timer = _loop->resource<uvw::TimerHandle>();
     _finish_session_timer->on<uvw::TimerEvent>([this, wait_time_start](const uvw::TimerEvent &event,
                                                    uvw::TimerHandle &h) {
+        auto now = std::chrono::high_resolution_clock::now();
+        auto cur_wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - wait_time_start).count();
+
+        if ((!_started_sending || _in_flight.size()) && (cur_wait_ms < (_traf_config->r_timeout * 1000))) {
+            // queries in flight and timeout time not elapsed, still wait
+            return;
+        } else if (cur_wait_ms < (_traf_config->s_delay)) {
+            // either timed out or nothing in flight. ensure delay period has passed
+            // before restarting
+            return;
+        }
         // L'ancien comportement était de ne recommencer à envoyer que quand on on avait plus de in-flight ou que le tiemout était dépassé => ce n'est plus nécessaire, la connexion reste ouverte donc on peut se permettre de déclnecher les envois régulièrement => commente ce bloc qui sert juste à vérifier qu'on a pas atteint le timeout et qu'on est encore en dessous du délai, ça utilise du CPU pour rien, le GC se charge très bien de collecter les timeouts en théorie, si on set le timer du gc à timeout / 2, il cach forcément tous les timeouts.
         // En plus, au lieu de programmer l'execution de cette fonction toutes les 50ms, on la programme à s_delay, comme ça elle se déclenche quand tout a été envoyé.
         _finish_session_timer->stop();
@@ -266,7 +288,8 @@ void TrafGen::start_wait_timer_for_tcp_finish()
             _tcp_session->on_connect_event();
         }
     });
-    _finish_session_timer->start(uvw::TimerHandle::Time{_traf_config->s_delay}, uvw::TimerHandle::Time{0});
+    // _finish_session_timer->start(uvw::TimerHandle::Time{1}, uvw::TimerHandle::Time{1});
+    _finish_session_timer->start(uvw::TimerHandle::Time{0}, uvw::TimerHandle::Time{1});
 }
 
 void TrafGen::udp_send()

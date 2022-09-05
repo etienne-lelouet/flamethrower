@@ -127,27 +127,34 @@ int on_frame_recv_callback(nghttp2_session *session,
 {
     auto class_session = static_cast<HTTPSSession *>(user_data);
     switch (frame->hd.type) {
-        case NGHTTP2_SETTINGS:
-            class_session->settings_received();
-            break;
-        case NGHTTP2_DATA:
-            if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
-                auto data = class_session->_recv_chunks[frame->data.hd.stream_id];
-                class_session->process_receive(data.data(), data.size());
-            }
+    case NGHTTP2_SETTINGS:
+        class_session->settings_received();
+        break;
+    case NGHTTP2_DATA:
+        if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
+            auto data = class_session->_recv_chunks[frame->data.hd.stream_id];
+            class_session->process_receive(data.data(), data.size());
+        }
     }
     return 0;
 }
 
 void HTTPSSession::init_nghttp2()
 {
+    nghttp2_option *options = NULL;
+    int rv = nghttp2_option_new(&options);
+    if (rv != 0) {
+		puts("error http2");
+		exit(1);
+    }
+    nghttp2_option_set_peer_max_concurrent_streams(options, UINT16_MAX);
     nghttp2_session_callbacks *callbacks;
     nghttp2_session_callbacks_new(&callbacks);
     nghttp2_session_callbacks_set_send_callback(callbacks, send_callback);
     nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, on_data_chunk_recv_callback);
     nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
     nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks, on_frame_recv_callback);
-    nghttp2_session_client_new(&_current_session, callbacks, this);
+    nghttp2_session_client_new2(&_current_session, callbacks, this, options);
     nghttp2_session_callbacks_del(callbacks);
 }
 
