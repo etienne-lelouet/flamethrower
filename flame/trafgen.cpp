@@ -217,7 +217,7 @@ void TrafGen::connect_tcp_events()
 
     // INCOMING: remote peer closed connection, EOF
     _tcp_handle->on<uvw::EndEvent>([this](uvw::EndEvent &event, uvw::TCPHandle &h) {
-		puts("connection reset by peer");
+        puts("connection reset by peer");
         _tcp_session->on_end_event();
     });
 
