@@ -121,7 +121,6 @@ void TrafGen::start_tcp_session()
         std::vector<uint16_t> id_list;
         for (int i = 0; i < _traf_config->batch_count; i++) {
             if (_free_id_list.empty()) {
-                puts("out of ids");
                 break;
             }
             if (_rate_limit && !_rate_limit->consume(1, this->_loop->now()))
@@ -152,7 +151,6 @@ void TrafGen::start_tcp_session()
         }
 
         if (id_list.size() == 0) {
-            puts("didn't sent anything");
             _tcp_handle->close();
             return;
         }
@@ -275,8 +273,8 @@ void TrafGen::start_wait_timer_for_tcp_finish()
             _tcp_session->on_connect_event();
         }
     });
-    // _finish_session_timer->start(uvw::TimerHandle::Time{1}, uvw::TimerHandle::Time{1});
     _finish_session_timer->start(uvw::TimerHandle::Time{0}, uvw::TimerHandle::Time{1});
+    // _finish_session_timer->start(uvw::TimerHandle::Time{_traf_config->s_delay}, uvw::TimerHandle::Time{0});
 }
 
 void TrafGen::udp_send()
