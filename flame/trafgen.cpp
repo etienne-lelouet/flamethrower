@@ -157,19 +157,19 @@ void TrafGen::start_tcp_session()
             _tcp_handle->close();
             return;
         }
-#ifdef DOH_ENABLE
-        if (_traf_config->protocol != Protocol::DOH) {
-#endif
-            auto qt = _qgen->next_tcp(id_list);
+// #ifdef DOH_ENABLE
+//         if (_traf_config->protocol != Protocol::DOH) {
+// #endif
+//             auto qt = _qgen->next_tcp(id_list);
 
-            // async send the batch. fires WriteEvent when finished sending.
-            _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
+//             // async send the batch. fires WriteEvent when finished sending.
+//             _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
 
-            _metrics->send(std::get<1>(qt), id_list.size(), _in_flight.size());
-#ifdef DOH_ENABLE
-        }
-#endif
-    };
+//             _metrics->send(std::get<1>(qt), id_list.size(), _in_flight.size());
+// #ifdef DOH_ENABLE
+//         }
+// #endif
+//     };
 
     // For now, treat a TLS handshake failure as malformed data
     if (_traf_config->protocol == Protocol::TCP) {
@@ -278,7 +278,7 @@ void TrafGen::start_wait_timer_for_tcp_finish()
             // before restarting
             return;
         }
-        // L'ancien comportement était de ne recommencer à envoyer que quand on on avait plus de in-flight ou que le tiemout était dépassé => ce n'est plus nécessaire, la connexion reste ouverte donc on peut se permettre de déclnecher les envois régulièrement => commente ce bloc qui sert juste à vérifier qu'on a pas atteint le timeout et qu'on est encore en dessous du délai, ça utilise du CPU pour rien, le GC se charge très bien de collecter les timeouts en théorie, si on set le timer du gc à timeout / 2, il cach forcément tous les timeouts.
+        // L'ancien comportement était de ne recommencer à envoyer que quand on on avait plus de in-flight ou que le tiemout était dépassé => ce n'est plus nécessaire, la connexion reste ouverte donc on peut se permettre de déclencher les envois régulièrement => commente ce bloc qui sert juste à vérifier qu'on a pas atteint le timeout et qu'on est encore en dessous du délai, ça utilise du CPU pour rien, le GC se charge très bien de collecter les timeouts en théorie, si on set le timer du gc à timeout / 2, il cach forcément tous les timeouts.
         // En plus, au lieu de programmer l'execution de cette fonction toutes les 50ms, on la programme à s_delay, comme ça elle se déclenche quand tout a été envoyé.
         _finish_session_timer->stop();
         _started_sending = false;
