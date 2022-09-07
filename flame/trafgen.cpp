@@ -136,7 +136,6 @@ void TrafGen::start_tcp_session()
             _started_sending = true;
 
 #ifdef DOH_ENABLE
-            // Send one by one with DoH
             if (_traf_config->protocol == Protocol::DOH) {
                 auto qt = (_traf_config->method == HTTPMethod::GET)
                     ? _qgen->next_base64url(id_list[i])
@@ -157,19 +156,7 @@ void TrafGen::start_tcp_session()
             _tcp_handle->close();
             return;
         }
-// #ifdef DOH_ENABLE
-//         if (_traf_config->protocol != Protocol::DOH) {
-// #endif
-//             auto qt = _qgen->next_tcp(id_list);
-
-//             // async send the batch. fires WriteEvent when finished sending.
-//             _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
-
-//             _metrics->send(std::get<1>(qt), id_list.size(), _in_flight.size());
-// #ifdef DOH_ENABLE
-//         }
-// #endif
-//     };
+    };
 
     // For now, treat a TLS handshake failure as malformed data
     if (_traf_config->protocol == Protocol::TCP) {
