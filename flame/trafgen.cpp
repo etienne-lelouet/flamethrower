@@ -149,6 +149,18 @@ void TrafGen::start_tcp_session()
             }
 #endif
         }
+#ifdef DOH_ENABLE
+        if (_traf_config->protocol != Protocol::DOH) {
+#endif
+            auto qt = _qgen->next_tcp(id_list);
+
+            // async send the batch. fires WriteEvent when finished sending.
+            _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
+
+            _metrics->send(std::get<1>(qt), id_list.size(), _in_flight.size());
+#ifdef DOH_ENABLE
+        }
+#endif
 
         if (id_list.size() == 0) {
             _tcp_handle->close();
