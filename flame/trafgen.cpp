@@ -141,11 +141,6 @@ void TrafGen::start_tcp_session()
                     : _qgen->next_udp(id_list[i]);
                 _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
                 _metrics->send(std::get<1>(qt), 1, _in_flight.size());
-            } else {
-                auto qt = _qgen->next_tcp(id_list[i]);
-                _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
-
-                _metrics->send(std::get<1>(qt), 1, _in_flight.size());
             }
 #endif
         }
@@ -285,8 +280,8 @@ void TrafGen::start_wait_timer_for_tcp_finish()
             _tcp_session->on_connect_event();
         }
     });
-    _finish_session_timer->start(uvw::TimerHandle::Time{0}, uvw::TimerHandle::Time{1});
-    // _finish_session_timer->start(uvw::TimerHandle::Time{_traf_config->s_delay}, uvw::TimerHandle::Time{0});
+    // _finish_session_timer->start(uvw::TimerHandle::Time{0}, uvw::TimerHandle::Time{5});
+    _finish_session_timer->start(uvw::TimerHandle::Time{1}, uvw::TimerHandle::Time{50});
 }
 
 void TrafGen::udp_send()
