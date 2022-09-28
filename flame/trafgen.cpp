@@ -281,7 +281,7 @@ void TrafGen::start_wait_timer_for_tcp_finish()
         }
     });
     // _finish_session_timer->start(uvw::TimerHandle::Time{0}, uvw::TimerHandle::Time{5});
-    _finish_session_timer->start(uvw::TimerHandle::Time{1}, uvw::TimerHandle::Time{50});
+    _finish_session_timer->start(uvw::TimerHandle::Time{1}, uvw::TimerHandle::Time{5});
 }
 
 void TrafGen::udp_send()
