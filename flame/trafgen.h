@@ -43,9 +43,9 @@ struct TrafGenConfig {
 #ifdef DOH_ENABLE
     HTTPMethod method{HTTPMethod::POST};
 #endif
-    const Target& next_target()
+    const Target &next_target()
     {
-        const Target& next = target_list[_current_target];
+        const Target &next = target_list[_current_target];
         _current_target++;
         if (_current_target >= target_list.size())
             _current_target = 0;
@@ -72,6 +72,8 @@ class TrafGen
     std::shared_ptr<uvw::TimerHandle> _shutdown_timer;
     std::shared_ptr<uvw::TimerHandle> _finish_session_timer;
 
+    std::chrono::time_point<std::chrono::high_resolution_clock> connection_time;
+
     // a hash of in flight queries, keyed by query id
     std::unordered_map<uint16_t, Query> _in_flight;
     // a randomized list of query ids that are not currently in flight
@@ -90,6 +92,7 @@ class TrafGen
     void connect_tcp_events();
     void start_tcp_session();
     void start_wait_timer_for_tcp_finish();
+    std::string pretty_print_conn_status();
 
 public:
     TrafGen(std::shared_ptr<uvw::Loop> l,

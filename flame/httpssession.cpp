@@ -118,7 +118,7 @@ static int on_stream_close_callback(nghttp2_session *session, int32_t stream_id,
         std::cerr << "No stream data on stream close" << std::endl;
         return 0;
     }
-    nghttp2_session_terminate_session(session, NGHTTP2_NO_ERROR);
+    // nghttp2_session_terminate_session(session, NGHTTP2_NO_ERROR);
     return 0;
 }
 
@@ -127,14 +127,14 @@ int on_frame_recv_callback(nghttp2_session *session,
 {
     auto class_session = static_cast<HTTPSSession *>(user_data);
     switch (frame->hd.type) {
-        case NGHTTP2_SETTINGS:
-            class_session->settings_received();
-            break;
-        case NGHTTP2_DATA:
-            if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
-                auto data = class_session->_recv_chunks[frame->data.hd.stream_id];
-                class_session->process_receive(data.data(), data.size());
-            }
+    case NGHTTP2_SETTINGS:
+        class_session->settings_received();
+        break;
+    case NGHTTP2_DATA:
+        if (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) {
+            auto data = class_session->_recv_chunks[frame->data.hd.stream_id];
+            class_session->process_receive(data.data(), data.size());
+        }
     }
     return 0;
 }
@@ -243,7 +243,7 @@ int HTTPSSession::session_send()
 
 void HTTPSSession::on_connect_event()
 {
-    _current_session = {};
+    // _current_session = {};
     do_handshake();
 }
 
@@ -343,8 +343,20 @@ void HTTPSSession::send_tls(void *data, size_t len)
 
 void HTTPSSession::do_handshake()
 {
+    switch (_tls_state) {
+    case LinkState::DATA:
+        TCPSession::on_connect_event();
+        return;
+    case LinkState::HANDSHAKE:
+        break;
+
+    case LinkState::CLOSE:
+        break;
+    }
+
     int err = gnutls_handshake(_gnutls_session);
     if (err == GNUTLS_E_SUCCESS) {
+		puts("gnutls_handshake_finished");
         gnutls_datum_t alpn;
         alpn.data = (unsigned char *)"h2";
         alpn.size = 2;
