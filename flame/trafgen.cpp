@@ -56,7 +56,6 @@ void TrafGen::process_wire(const char data[], size_t len)
         _metrics->bad_receive(_in_flight.size());
         return;
     }
-    puts("received");
     _metrics->receive(_in_flight[id].send_time, rcode, _in_flight.size());
     _in_flight.erase(id);
     _free_id_list.push_back(id);
@@ -107,7 +106,6 @@ void TrafGen::start_tcp_session()
     _metrics->trafgen_id(_tcp_handle->sock().port);
 
     auto malformed_data = [this]() {
-        puts("received malformed data, closing");
         _metrics->net_error();
         handle_timeouts(true);
         _tcp_handle->close();
@@ -119,7 +117,6 @@ void TrafGen::start_tcp_session()
     };
 
     auto connection_ready = [this]() {
-        puts("sending");
         /** SEND DATA **/
         uint16_t id{0};
         std::vector<uint16_t> id_list;
@@ -148,7 +145,6 @@ void TrafGen::start_tcp_session()
                 _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
                 _metrics->send(std::get<1>(qt), 1, _in_flight.size());
             }
-            puts("sent");
 #endif
         }
 
@@ -187,7 +183,6 @@ void TrafGen::start_tcp_session()
         return;
     }
 
-    puts("connecting...");
     // fires ConnectEvent when connected
     if (_traf_config->family == AF_INET) {
         _tcp_handle->connect<uvw::IPv4>(current_target.address, _traf_config->port);
@@ -225,7 +220,6 @@ void TrafGen::connect_tcp_events()
             _sender_timer = _loop->resource<uvw::TimerHandle>();
             _sender_timer->on<uvw::TimerEvent>([this](const uvw::TimerEvent &event,
                                                    uvw::TimerHandle &h) {
-                puts("waking up, starting tcp session");
                 start_tcp_session();
             });
             _sender_timer->start(uvw::TimerHandle::Time{_traf_config->s_delay}, uvw::TimerHandle::Time{0});
@@ -234,7 +228,6 @@ void TrafGen::connect_tcp_events()
 
     // SOCKET: socket error
     _tcp_handle->on<uvw::ErrorEvent>([this](uvw::ErrorEvent &event, uvw::TCPHandle &h) {
-        puts("received error event, closing connection");
         if (_config->verbosity() > 1) {
             std::cerr << _tcp_handle->sock().ip << ":" << _tcp_handle->sock().port << " - " << event.what() << std::endl;
         }
@@ -260,9 +253,7 @@ void TrafGen::connect_tcp_events()
 
     // OUTGOING: write operation has finished
     _tcp_handle->on<uvw::WriteEvent>([this](uvw::WriteEvent &event, uvw::TCPHandle &h) {
-        puts("WriteEvent");
         if (!_finish_session_timer && _started_sending) {
-            puts("arming finish_session_timer");
             start_wait_timer_for_tcp_finish();
         }
     });
@@ -296,9 +287,7 @@ void TrafGen::start_wait_timer_for_tcp_finish()
         // Ou j'ai reçu ma réponse, ou le timeout est passé et donc je ne recevrais pas ma réponse
         auto connection_lasted_for = std::chrono::duration_cast<std::chrono::milliseconds>(now - connection_time).count();
         // si à la reception, on se rend compte que la durée de la connection est expirée, on ferme la connection, le timer d'envoi sera réarmé un des callback
-        printf("connection_lasted_for = %lu\n", connection_lasted_for);
         if (connection_lasted_for + _traf_config->s_delay >= _traf_config->c_delay) {
-            puts("finish_session_timer, preparing to close");
             // shut down timer and connection. TCP CloseEvent will handle restarting sends.
             _finish_session_timer->stop();
             _started_sending = false;
@@ -307,7 +296,6 @@ void TrafGen::start_wait_timer_for_tcp_finish()
             _tcp_handle->close();
         } else {
             if (!_stopping) {
-                puts("finish_session_timer, preparing to send again");
                 _finish_session_timer->stop();
                 _finish_session_timer->close();
                 _finish_session_timer.reset();
@@ -317,7 +305,6 @@ void TrafGen::start_wait_timer_for_tcp_finish()
                 _sender_timer = _loop->resource<uvw::TimerHandle>();
                 _sender_timer->on<uvw::TimerEvent>([this](const uvw::TimerEvent &event,
                                                        uvw::TimerHandle &h) {
-                    puts("woke up, sending");
                     _tcp_session->on_connect_event();
                 });
                 _sender_timer->start(uvw::TimerHandle::Time{_traf_config->s_delay}, uvw::TimerHandle::Time{0});

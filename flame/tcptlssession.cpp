@@ -154,7 +154,6 @@ void TCPTLSSession::do_handshake()
 
     int err = gnutls_handshake(_gnutls_session);
     if (err == GNUTLS_E_SUCCESS) {
-        puts("tls handshake done");
         _tls_state = LinkState::DATA;
         TCPSession::on_connect_event();
     } else if (err < 0 && gnutls_error_is_fatal(err)) {

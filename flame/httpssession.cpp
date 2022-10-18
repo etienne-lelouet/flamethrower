@@ -356,7 +356,6 @@ void HTTPSSession::do_handshake()
 
     int err = gnutls_handshake(_gnutls_session);
     if (err == GNUTLS_E_SUCCESS) {
-		puts("gnutls_handshake_finished");
         gnutls_datum_t alpn;
         alpn.data = (unsigned char *)"h2";
         alpn.size = 2;
