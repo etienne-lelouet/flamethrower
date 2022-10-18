@@ -39,6 +39,7 @@ struct TrafGenConfig {
     int r_timeout{3};
     long s_delay{1};
     long batch_count{10};
+	long c_delay{1000};
     Protocol protocol{Protocol::UDP};
 #ifdef DOH_ENABLE
     HTTPMethod method{HTTPMethod::POST};

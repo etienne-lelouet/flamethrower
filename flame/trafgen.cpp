@@ -296,7 +296,8 @@ void TrafGen::start_wait_timer_for_tcp_finish()
         // Ou j'ai reçu ma réponse, ou le timeout est passé et donc je ne recevrais pas ma réponse
         auto connection_lasted_for = std::chrono::duration_cast<std::chrono::milliseconds>(now - connection_time).count();
         // si à la reception, on se rend compte que la durée de la connection est expirée, on ferme la connection, le timer d'envoi sera réarmé un des callback
-        if (connection_lasted_for >= 1000) {
+        printf("connection_lasted_for = %lu\n", connection_lasted_for);
+        if (connection_lasted_for + _traf_config->s_delay >= _traf_config->c_delay) {
             puts("finish_session_timer, preparing to close");
             // shut down timer and connection. TCP CloseEvent will handle restarting sends.
             _finish_session_timer->stop();
