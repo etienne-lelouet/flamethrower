@@ -256,7 +256,18 @@ void TrafGen::start_wait_timer_for_tcp_finish()
     _finish_session_timer = _loop->resource<uvw::TimerHandle>();
     _finish_session_timer->on<uvw::TimerEvent>([this, wait_time_start](const uvw::TimerEvent &event,
                                                    uvw::TimerHandle &h) {
-        // L'ancien comportement était de ne recommencer à envoyer que quand on on avait plus de in-flight ou que le tiemout était dépassé => ce n'est plus nécessaire, la connexion reste ouverte donc on peut se permettre de déclnecher les envois régulièrement => commente ce bloc qui sert juste à vérifier qu'on a pas atteint le timeout et qu'on est encore en dessous du délai, ça utilise du CPU pour rien, le GC se charge très bien de collecter les timeouts en théorie, si on set le timer du gc à timeout / 2, il cach forcément tous les timeouts.
+        auto now = std::chrono::high_resolution_clock::now();
+        auto cur_wait_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - wait_time_start).count();
+
+        if ((!_started_sending || _in_flight.size()) && (cur_wait_ms < (_traf_config->r_timeout * 1000))) {
+            // queries in flight and timeout time not elapsed, still wait
+            return;
+        } else if (cur_wait_ms < (_traf_config->s_delay)) {
+            // either timed out or nothing in flight. ensure delay period has passed
+            // before restarting
+            return;
+        }
+        // L'ancien comportement était de ne recommencer à envoyer que quand on on avait plus de in-flight ou que le tiemout était dépassé => ce n'est plus nécessaire, la connexion reste ouverte donc on peut se permettre de déclencher les envois régulièrement => commente ce bloc qui sert juste à vérifier qu'on a pas atteint le timeout et qu'on est encore en dessous du délai, ça utilise du CPU pour rien, le GC se charge très bien de collecter les timeouts en théorie, si on set le timer du gc à timeout / 2, il cach forcément tous les timeouts.
         // En plus, au lieu de programmer l'execution de cette fonction toutes les 50ms, on la programme à s_delay, comme ça elle se déclenche quand tout a été envoyé.
         _finish_session_timer->stop();
         _started_sending = false;
@@ -266,7 +277,8 @@ void TrafGen::start_wait_timer_for_tcp_finish()
             _tcp_session->on_connect_event();
         }
     });
-    _finish_session_timer->start(uvw::TimerHandle::Time{_traf_config->s_delay}, uvw::TimerHandle::Time{0});
+    // _finish_session_timer->start(uvw::TimerHandle::Time{0}, uvw::TimerHandle::Time{5});
+    _finish_session_timer->start(uvw::TimerHandle::Time{1}, uvw::TimerHandle::Time{1});
 }
 
 void TrafGen::udp_send()
