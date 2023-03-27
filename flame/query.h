@@ -71,7 +71,8 @@ public:
 #ifdef DOH_ENABLE
     virtual QueryTpt next_base64url(uint16_t);
 #endif
-    virtual QueryTpt next_udp(uint16_t);
+  virtual QueryTpt next_udp(uint16_t);
+  virtual QueryTpt next_tcp(uint16_t);
     virtual QueryTpt next_tcp(const std::vector<uint16_t> &);
     bool finished();
 

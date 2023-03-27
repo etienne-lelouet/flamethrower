@@ -160,6 +160,29 @@ QueryGenerator::QueryTpt QueryGenerator::next_base64url(uint16_t id)
 }
 #endif
 
+QueryGenerator::QueryTpt QueryGenerator::next_tcp(const uint16_t id)
+{
+
+    // get total len
+    size_t total_len{0};
+    auto r = _reqs;
+    total_len += 2 + _wire_buffers[r++ % _wire_buffers.size()].second;
+
+    size_t offset{0};
+    auto buf = std::make_unique<char[]>(total_len);
+    WireTpt w = _wire_buffers[_reqs++ % _wire_buffers.size()];
+    // write pkt len
+    uint16_t plen = htons(w.second);
+    memcpy(buf.get() + offset, &plen, sizeof(plen));
+    // write wire
+    memcpy(buf.get() + 2 + offset, w.first, w.second);
+    // write id requested
+    uint16_t _id = ntohs(id);
+    memcpy(buf.get() + 2 + offset, &_id, sizeof(_id));
+    offset += w.second + 2;
+    return std::make_tuple(std::move(buf), total_len);
+}
+
 QueryGenerator::QueryTpt QueryGenerator::next_tcp(const std::vector<uint16_t> &id_list)
 {
 
