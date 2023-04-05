@@ -137,20 +137,28 @@ void TrafGen::start_tcp_session()
             _started_sending = true;
 
 #ifdef DOH_ENABLE
-            // Send one by one with DoH
+	     // Send one by one with DoH
             if (_traf_config->protocol == Protocol::DOH) {
                 auto qt = (_traf_config->method == HTTPMethod::GET)
                     ? _qgen->next_base64url(id_list[i])
                     : _qgen->next_udp(id_list[i]);
                 _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
                 _metrics->send(std::get<1>(qt), 1, _in_flight.size());
-            } else {
-	      auto qt = _qgen->next_tcp(id_list[i]);
-	      _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
-	      _metrics->send(std::get<1>(qt), 1, _in_flight.size());
-	    }
+            }
 #endif
         }
+#ifdef DOH_ENABLE
+        if (_traf_config->protocol != Protocol::DOH) {
+#endif
+            auto qt = _qgen->next_tcp(id_list);
+
+            // async send the batch. fires WriteEvent when finished sending.
+            _tcp_session->write(std::move(std::get<0>(qt)), std::get<1>(qt));
+
+            _metrics->send(std::get<1>(qt), id_list.size(), _in_flight.size());
+#ifdef DOH_ENABLE
+        }
+#endif
 
         if (id_list.size() == 0) {
             // didn't send anything, probably due to rate limit. close.
@@ -188,7 +196,7 @@ void TrafGen::connect_tcp_events()
 
     // SOCKET: local socket was closed, cleanup resources and possibly restart another connection
     _tcp_handle->on<uvw::CloseEvent>([this](uvw::CloseEvent &event, uvw::TCPHandle &h) {
-        // if timer is still going (e.g. we got here through EndEvent), cancel it
+       // if timer is still going (e.g. we got here through EndEvent), cancel it
         if (_finish_session_timer.get()) {
             _finish_session_timer->stop();
             _finish_session_timer->close();
@@ -206,7 +214,6 @@ void TrafGen::connect_tcp_events()
         _sender_timer.reset();
 
         handle_timeouts(true);
-
         if (!_stopping) {
             _sender_timer = _loop->resource<uvw::TimerHandle>();
             _sender_timer->on<uvw::TimerEvent>([this](const uvw::TimerEvent &event,
@@ -277,7 +284,7 @@ void TrafGen::start_wait_timer_for_tcp_finish()
         }
         // Ou j'ai reçu ma réponse, ou le timeout est passé et donc je ne recevrais pas ma réponse
         auto connection_lasted_for = std::chrono::duration_cast<std::chrono::milliseconds>(now - connection_time).count();
-        // si à la reception, on se rend compte que la durée de la connection est expirée, on ferme la connection, le timer d'envoi sera réarmé un des callback
+        // si à la reception, on se rend compte que la durée de la connection est expirée, on ferme la connection, le timer d'envoi sera réarmé dans le callback de fermeture de tcp_handle
         if (connection_lasted_for + _traf_config->s_delay >= _traf_config->c_delay) {
             // shut down timer and connection. TCP CloseEvent will handle restarting sends.
             _finish_session_timer->stop();
