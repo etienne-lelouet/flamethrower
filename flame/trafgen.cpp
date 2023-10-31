@@ -236,6 +236,7 @@ void TrafGen::connect_tcp_events()
 
     // INCOMING: remote peer closed connection, EOF
     _tcp_handle->on<uvw::EndEvent>([this](uvw::EndEvent &event, uvw::TCPHandle &h) {
+	std::cerr << "session was closed" << id << std::endl;
         _tcp_session->on_end_event();
     });
 
