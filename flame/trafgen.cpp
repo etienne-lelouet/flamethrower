@@ -196,6 +196,7 @@ void TrafGen::connect_tcp_events()
 
     // SOCKET: local socket was closed, cleanup resources and possibly restart another connection
     _tcp_handle->on<uvw::CloseEvent>([this](uvw::CloseEvent &event, uvw::TCPHandle &h) {
+	std::cout << "closing the session" << std::endl;
        // if timer is still going (e.g. we got here through EndEvent), cancel it
         if (_finish_session_timer.get()) {
             _finish_session_timer->stop();
@@ -261,6 +262,7 @@ void TrafGen::connect_tcp_events()
 
     // SOCKET: on connect
     _tcp_handle->on<uvw::ConnectEvent>([this](uvw::ConnectEvent &event, uvw::TCPHandle &h) {
+	std::cout << "session opened" << std::endl;
         connection_time = std::chrono::high_resolution_clock::now();
         _tcp_session->on_connect_event();
         _metrics->tcp_connection();
