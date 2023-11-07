@@ -196,7 +196,6 @@ void TrafGen::connect_tcp_events()
 
     // SOCKET: local socket was closed, cleanup resources and possibly restart another connection
     _tcp_handle->on<uvw::CloseEvent>([this](uvw::CloseEvent &event, uvw::TCPHandle &h) {
-	std::cout << "closing the session" << std::endl;
        // if timer is still going (e.g. we got here through EndEvent), cancel it
         if (_finish_session_timer.get()) {
             _finish_session_timer->stop();
@@ -213,8 +212,6 @@ void TrafGen::connect_tcp_events()
         _finish_session_timer.reset();
         _tcp_handle.reset();
         _sender_timer.reset();
-
-	// uvw::TimerHandle::Time sender_remaining = _sender_timer.due_in();
 
         handle_timeouts(true);
         if (!_stopping) {
@@ -239,7 +236,6 @@ void TrafGen::connect_tcp_events()
 
     // INCOMING: remote peer closed connection, EOF
     _tcp_handle->on<uvw::EndEvent>([this](uvw::EndEvent &event, uvw::TCPHandle &h) {
-	std::cout << "session was closed by remote" << std::endl;
         _tcp_session->on_end_event();
     });
 
@@ -262,10 +258,10 @@ void TrafGen::connect_tcp_events()
 
     // SOCKET: on connect
     _tcp_handle->on<uvw::ConnectEvent>([this](uvw::ConnectEvent &event, uvw::TCPHandle &h) {
-	std::cout << "session opened" << std::endl;
         connection_time = std::chrono::high_resolution_clock::now();
         _tcp_session->on_connect_event();
         _metrics->tcp_connection();
+
         // start reading from incoming stream, fires DataEvent when receiving
         _tcp_handle->read();
     });
